@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Event Check-In</title>
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+<style>
+body{font-family:Arial,sans-serif;margin:0;padding:20px;background:#f5f5f5;text-align:center}
+h1{font-size:32px;margin:10px 0 20px}
+#reader{width:100%;max-width:420px;margin:auto;background:#fff;border-radius:15px;overflow:hidden}
+#result{margin:20px auto;max-width:420px}.card{background:#fff;padding:24px;border-radius:15px;box-shadow:0 2px 10px #0002}
+.success{border:4px solid #22c55e}.warning{border:4px solid #f59e0b}.error{border:4px solid #ef4444}
+.name{font-size:27px;font-weight:bold;margin:15px 0}.status{font-size:21px;font-weight:bold;margin-top:18px}
+button{border:0;border-radius:10px;padding:14px 22px;font-size:17px;margin-top:18px}
+.green{background:#22c55e;color:#fff}.orange{background:#f59e0b;color:#fff}.red{background:#ef4444;color:#fff}
+#loading{display:none;margin:20px;font-size:18px}
+</style>
+</head>
+<body>
+<h1>CHECK-IN PESERTA</h1>
+<div id="reader"></div><div id="loading">Memproses check-in...</div><div id="result"></div>
+<script>
+const API="https://script.google.com/macros/s/AKfycbziHuhxG8DWskyELxjUIalKOtNvuitgXrrbu50YgwAGPivL8zGf0rFFUCBYVpxwhXo4/exec";
+let scanner,processing=false,n=0;
+function startScanner(){
+ scanner=new Html5Qrcode("reader");
+ scanner.start({facingMode:"environment"},{fps:10,qrbox:{width:250,height:250}},onScanSuccess)
+ .catch(e=>document.getElementById("result").innerHTML="<div class='card error'><h2>❌ Kamera tidak dapat digunakan</h2><p>"+esc(e.message||e)+"</p></div>");
+}
+function onScanSuccess(qr){
+ if(processing)return; processing=true;
+ document.getElementById("loading").style.display="block";
+ const cb="qrCallback"+(++n);
+ window[cb]=r=>{showResult(r);delete window[cb];let x=document.getElementById("j"+cb);if(x)x.remove()};
+ const s=document.createElement("script");s.id="j"+cb;
+ s.src=API+"?qrId="+encodeURIComponent(qr)+"&callback="+cb;
+ s.onerror=()=>{document.getElementById("loading").style.display="none";document.getElementById("result").innerHTML="<div class='card error'><h2>❌ GAGAL TERHUBUNG</h2><p>Tidak dapat menghubungi sistem check-in.</p><button class='red' onclick='nextScan()'>COBA LAGI</button></div>";processing=false;s.remove();delete window[cb]};
+ document.body.appendChild(s);
+}
+function showResult(r){
+ document.getElementById("loading").style.display="none";let h="";
+ if(r.success){let c=r.statusTim==="LENGKAP";h="<div class='card "+(c?"success":"warning")+"'><h2>✓ CHECK-IN BERHASIL</h2><div class='name'>"+esc(r.nama)+"</div><p>Tim: <b>"+esc(r.idTim)+"</b></p><hr><p>Partner:</p><h3>"+esc(r.partner)+"</h3><p>Status Partner: <b>"+(r.partnerStatus==="HADIR"?"🟢 SUDAH HADIR":"🔴 BELUM HADIR")+"</b></p><div class='status'>"+(c?"🟢 TIM LENGKAP":"🟠 MENUNGGU PARTNER")+"</div><p>Check-in:</p><b>"+esc(r.checkInDate)+" "+esc(r.checkInTime)+"</b><br><button class='green' onclick='nextScan()'>SCAN PESERTA BERIKUTNYA</button></div>"}
+ else if(r.duplicate)h="<div class='card warning'><h2>⚠ SUDAH CHECK-IN</h2><div class='name'>"+esc(r.nama)+"</div><p>Tim: <b>"+esc(r.idTim)+"</b></p><p>Check-in pertama:</p><h3>"+esc(r.checkInDate)+" "+esc(r.checkInTime)+"</h3><button class='orange' onclick='nextScan()'>SCAN BERIKUTNYA</button></div>";
+ else h="<div class='card error'><h2>❌ QR TIDAK VALID</h2><p>"+esc(r.message||"QR tidak terdaftar")+"</p><button class='red' onclick='nextScan()'>COBA LAGI</button></div>";
+ document.getElementById("result").innerHTML=h;
+}
+function nextScan(){document.getElementById("result").innerHTML="";processing=false}
+function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]))}
+window.onload=startScanner;
+</script></body></html>
